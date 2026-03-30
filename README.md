@@ -12,4 +12,4 @@ I’m building projects to showcase my skills in **SQL, Python, Java, data visua
 
 ## Contact
 - Email: danayitak@gmail.com
-- LinkedIn: [Your LinkedIn]([https://www.linkedin.com/](https://www.linkedin.com/in/danayit-akalu-7a6562339/))
+- LinkedIn: https://www.linkedin.com/in/danayit-akalu-7a6562339/ 
