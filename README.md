@@ -1,6 +1,6 @@
 # My Portfolio
 
-Hi! I’m Danayit Akalu, an Information Science student at [Your University], expected to graduate in May 2026. I’m on the **Dean’s List** and passionate about **data analysis, data science, and UX research**.
+Hi! I’m Danayit Akalu, an Information Science student at University of Maryland, expected to graduate in May 2026. I’m on the **Dean’s List** and passionate about **data analysis, data science, and UX research**.
 
 I’m building projects to showcase my skills in **SQL, Python, Java, data visualization, and UX research**.
 
