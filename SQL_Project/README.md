@@ -1,4 +1,4 @@
-# SQL Database Portfolio Project
+# University Course Catalog Database
 
 ## Project Goal
 This project demonstrates my ability to design and manage a relational database using SQL and MySQL. It showcases database creation, table design, data insertion, and queries to extract meaningful insights.
