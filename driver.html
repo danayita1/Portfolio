@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Driver Mode</title>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; padding: 24px; }
+    button { font-size: 20px; padding: 14px 28px; border: none; border-radius: 8px; color: white; background: #1a7f4b; }
+    button.stop { background: #c0392b; }
+    #status { margin-top: 24px; font-size: 18px; }
+  </style>
+</head>
+<body>
+  <h1>Driver Mode</h1>
+  <button id="toggle">Start sharing location</button>
+  <p id="status">Not sharing.</p>
+
+   <script>
+    var watchId = null;
+    var button = document.getElementById('toggle');
+    var statusEl = document.getElementById('status');
+
+    function sendLocation(position) {
+      var lat = position.coords.latitude;
+      var lng = position.coords.longitude;
+
+      fetch('/location', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lat: lat, lng: lng })
+      })
+        .then(function () {
+          statusEl.textContent = 'Sharing. Last sent: ' + lat.toFixed(5) + ', ' + lng.toFixed(5);
+        })
+        .catch(function () {
+          statusEl.textContent = 'Could not reach the server.';
+        });
+    }
+
+    function locationError(error) {
+      statusEl.textContent = 'Location error: ' + error.message;
+    }
+
+    button.addEventListener('click', function () {
+      if (watchId === null) {
+        if (!navigator.geolocation) {
+          statusEl.textContent = 'This device does not support location.';
+          return;
+        }
+        statusEl.textContent = 'Waiting for GPS...';
+        watchId = navigator.geolocation.watchPosition(sendLocation, locationError, {
+          enableHighAccuracy: true
+        });
+        button.textContent = 'Stop sharing';
+        button.className = 'stop';
+      } else {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+        button.textContent = 'Start sharing location';
+        button.className = '';
+        statusEl.textContent = 'Not sharing.';
+      }
+    });
+  </script>
+</body>
+</html>
