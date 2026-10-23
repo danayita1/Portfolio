@@ -1,7 +1,7 @@
 # Portfolio
 Projects by Danayit Akalu, University of Maryland graduate (Information Science).
 
-# Fanus | Portfolio
+# Danayit | Portfolio
 
 Recent University of Maryland graduate (B.S., Information Science) seeking entry-level roles in software development,
 software engineering, and data analysis. I build practical tools in Python, Java, and web technologies, 
