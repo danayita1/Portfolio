@@ -5,7 +5,7 @@ A live bus tracking web app, built to solve a real problem in Addis Ababa: many 
 
 **Live demo:** https://danayitdev.pythonanywhere.com/
 
-![Bus Tracker map](screenshot.png)
+![Bus Tracker map](Screenshot.png)
 
 ## How it works
 
