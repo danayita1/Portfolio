@@ -20,40 +20,181 @@
   <div id="map"></div>
 
      <script>
-    // Create the map, centered between Meskel Square and Bole
-    var map = L.map('map').setView([9.0000, 38.7800], 14);
+    var map = L.map('map').setView([9.0300, 38.7400], 13);
 
-    // Load the map pictures (tiles) from OpenStreetMap
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
-    // Add the bus dot (it starts in the middle of the map)
-    var bus = L.circleMarker([9.0000, 38.7800], {
-      radius: 10,
-      color: '#c0392b',
-      fillColor: '#e74c3c',
-      fillOpacity: 0.9
-    }).addTo(map);
+    // Assumed average bus speed, used for arrival estimates
+    var SPEED_KMH = 20;
 
-    bus.bindPopup('Bus 1');
+    var routes = {};
+    var routeCum = {};     // distance in meters from the first stop to each stop
+    var stopMarkers = {};  // stop dots, by route
+    var markers = {};      // bus dots, by bus ID
 
-    // Ask the server for the latest bus location and move the dot there
-    function updateBus() {
-      fetch('http://127.0.0.1:5000/location')
-        .then(function (response) { return response.json(); })
+    // Distance in meters between two [lat, lng] points
+    function meters(a, b) {
+      var R = 6371000;
+      var toRad = Math.PI / 180;
+      var dLat = (b[0] - a[0]) * toRad;
+      var dLng = (b[1] - a[1]) * toRad;
+      var h = Math.pow(Math.sin(dLat / 2), 2) +
+              Math.cos(a[0] * toRad) * Math.cos(b[0] * toRad) * Math.pow(Math.sin(dLng / 2), 2);
+      return 2 * R * Math.asin(Math.sqrt(h));
+    }
+
+    // Find where a bus is along a route, and how far it is from the route line
+    function progressOnRoute(routeId, lat, lng) {
+      var stops = routes[routeId].stops;
+      var cum = routeCum[routeId];
+      var best = null;
+
+      for (var i = 0; i < stops.length - 1; i++) {
+        var A = stops[i];
+        var B = stops[i + 1];
+        var k = Math.cos(A.lat * Math.PI / 180) * 111320;
+        var abx = (B.lng - A.lng) * k;
+        var aby = (B.lat - A.lat) * 110540;
+        var apx = (lng - A.lng) * k;
+        var apy = (lat - A.lat) * 110540;
+        var len2 = abx * abx + aby * aby;
+        var t = len2 === 0 ? 0 : (apx * abx + apy * aby) / len2;
+        t = Math.max(0, Math.min(1, t));
+        var dx = apx - t * abx;
+        var dy = apy - t * aby;
+        var off = Math.sqrt(dx * dx + dy * dy);
+
+        if (best === null || off < best.off) {
+          best = { off: off, along: cum[i] + t * (cum[i + 1] - cum[i]) };
+        }
+      }
+      return best;
+    }
+
+    // Draw every route as a line, with a small dot for each stop
+    function drawRoutes() {
+      return fetch('/routes')
+        .then(function (r) { return r.json(); })
         .then(function (data) {
-          bus.setLatLng([data.lat, data.lng]);
+          routes = data;
+          var allPoints = [];
+
+          Object.keys(routes).forEach(function (id) {
+            var route = routes[id];
+            var points = route.stops.map(function (s) { return [s.lat, s.lng]; });
+            allPoints = allPoints.concat(points);
+
+            // Distance from the first stop to each stop
+            var cum = [0];
+            for (var i = 1; i < points.length; i++) {
+              cum.push(cum[i - 1] + meters(points[i - 1], points[i]));
+            }
+            routeCum[id] = cum;
+
+            L.polyline(points, { color: route.color, weight: 4 }).addTo(map);
+
+            stopMarkers[id] = route.stops.map(function (stop) {
+              var marker = L.circleMarker([stop.lat, stop.lng], {
+                radius: 6,
+                color: route.color,
+                fillColor: 'white',
+                fillOpacity: 1,
+                weight: 3
+              }).addTo(map);
+              marker.bindTooltip(stop.name + ': no bus approaching');
+              return marker;
+            });
+          });
+
+          if (allPoints.length > 0) {
+            map.fitBounds(allPoints, { padding: [40, 40] });
+          }
+        });
+    }
+
+    // Work out the arrival estimate for every stop and show it on hover
+    function updateStopTimes(buses) {
+      Object.keys(routes).forEach(function (routeId) {
+        var cum = routeCum[routeId];
+        var onRoute = [];
+
+        Object.keys(buses).forEach(function (id) {
+          var b = buses[id];
+          if (b.route_id !== routeId) return;
+          var p = progressOnRoute(routeId, b.lat, b.lng);
+          if (p.off <= 500) {
+            onRoute.push({ id: id, along: p.along });
+          }
+        });
+
+        routes[routeId].stops.forEach(function (stop, j) {
+          var bestMinutes = null;
+          var bestId = null;
+
+          onRoute.forEach(function (b) {
+            var remaining = cum[j] - b.along;
+            // Only count buses that have not passed this stop yet
+            if (remaining >= -50) {
+              var minutes = Math.max(0, remaining) / (SPEED_KMH * 1000 / 60);
+              if (bestMinutes === null || minutes < bestMinutes) {
+                bestMinutes = minutes;
+                bestId = b.id;
+              }
+            }
+          });
+
+          var text;
+          if (bestMinutes === null) {
+            text = stop.name + ': no bus approaching';
+          } else if (bestMinutes < 1) {
+            text = stop.name + ': ' + bestId + ' arriving now';
+          } else {
+            text = stop.name + ': ' + bestId + ' in about ' + Math.round(bestMinutes) + ' min';
+          }
+          stopMarkers[routeId][j].setTooltipContent(text);
+        });
+      });
+    }
+
+    // Ask the server where the buses are, move their dots, update arrival times
+    function updateBuses() {
+      fetch('/location')
+        .then(function (response) { return response.json(); })
+        .then(function (buses) {
+          Object.keys(buses).forEach(function (id) {
+            var bus = buses[id];
+            var position = [bus.lat, bus.lng];
+            var routeName = routes[bus.route_id] ? routes[bus.route_id].name : '';
+            var label = id + (routeName ? ' - ' + routeName : '');
+
+            if (markers[id]) {
+              markers[id].setLatLng(position);
+              markers[id].setTooltipContent(label);
+            } else {
+              markers[id] = L.circleMarker(position, {
+                radius: 10,
+                color: '#c0392b',
+                fillColor: '#e74c3c',
+                fillOpacity: 0.9
+              }).addTo(map);
+              markers[id].bindTooltip(label, { permanent: true, direction: 'top' });
+            }
+          });
+
+          updateStopTimes(buses);
         })
         .catch(function (error) {
           console.log('Could not reach the server:', error);
         });
     }
 
-    // Do it once now, then again every 2 seconds
-    updateBus();
-    setInterval(updateBus, 2000);
+    drawRoutes().then(function () {
+      updateBuses();
+      setInterval(updateBuses, 5000);
+    });
   </script>
 </body>
 </html>

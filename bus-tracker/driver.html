@@ -6,20 +6,42 @@
   <title>Driver Mode</title>
   <style>
     body { font-family: Arial, sans-serif; text-align: center; padding: 24px; }
-    button { font-size: 20px; padding: 14px 28px; border: none; border-radius: 8px; color: white; background: #1a7f4b; }
+    input, select { font-size: 20px; padding: 10px; border: 1px solid #999; border-radius: 8px; width: 280px; text-align: center; margin-bottom: 12px; }
+    button { font-size: 20px; padding: 14px 28px; border: none; border-radius: 8px; color: white; background: #1a7f4b; margin-top: 8px; }
     button.stop { background: #c0392b; }
     #status { margin-top: 24px; font-size: 18px; }
   </style>
 </head>
 <body>
   <h1>Driver Mode</h1>
+  <input id="busId" type="text" placeholder="Bus ID, e.g. Bus 1">
+  <br>
+  <select id="route"></select>
+  <br>
   <button id="toggle">Start sharing location</button>
   <p id="status">Not sharing.</p>
 
-   <script>
+  <script>
     var watchId = null;
     var button = document.getElementById('toggle');
     var statusEl = document.getElementById('status');
+    var busInput = document.getElementById('busId');
+    var routeSelect = document.getElementById('route');
+
+    // Fill the route dropdown from the server
+    fetch('/routes')
+      .then(function (r) { return r.json(); })
+      .then(function (routes) {
+        Object.keys(routes).forEach(function (id) {
+          var option = document.createElement('option');
+          option.value = id;
+          option.textContent = routes[id].name;
+          routeSelect.appendChild(option);
+        });
+      })
+      .catch(function () {
+        statusEl.textContent = 'Could not load routes.';
+      });
 
     function sendLocation(position) {
       var lat = position.coords.latitude;
@@ -28,10 +50,15 @@
       fetch('/location', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lat: lat, lng: lng })
+        body: JSON.stringify({
+          bus_id: busInput.value,
+          route_id: routeSelect.value,
+          lat: lat,
+          lng: lng
+        })
       })
         .then(function () {
-          statusEl.textContent = 'Sharing. Last sent: ' + lat.toFixed(5) + ', ' + lng.toFixed(5);
+          statusEl.textContent = busInput.value + ' sharing. Last sent: ' + lat.toFixed(5) + ', ' + lng.toFixed(5);
         })
         .catch(function () {
           statusEl.textContent = 'Could not reach the server.';
@@ -44,6 +71,10 @@
 
     button.addEventListener('click', function () {
       if (watchId === null) {
+        if (busInput.value.trim() === '') {
+          statusEl.textContent = 'Please type a Bus ID first.';
+          return;
+        }
         if (!navigator.geolocation) {
           statusEl.textContent = 'This device does not support location.';
           return;
@@ -52,11 +83,15 @@
         watchId = navigator.geolocation.watchPosition(sendLocation, locationError, {
           enableHighAccuracy: true
         });
+        busInput.disabled = true;
+        routeSelect.disabled = true;
         button.textContent = 'Stop sharing';
         button.className = 'stop';
       } else {
         navigator.geolocation.clearWatch(watchId);
         watchId = null;
+        busInput.disabled = false;
+        routeSelect.disabled = false;
         button.textContent = 'Start sharing location';
         button.className = '';
         statusEl.textContent = 'Not sharing.';

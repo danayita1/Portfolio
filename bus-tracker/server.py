@@ -1,12 +1,57 @@
+import os
+import sqlite3
+
 from flask import Flask, jsonify, request, send_from_directory
 
 app = Flask(__name__)
 
-# The latest bus location. It starts at the beginning of our pretend route.
-bus_location = {"lat": 9.0107, "lng": 38.7612}
+# The database is a file called buses.db, saved next to this script
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, "buses.db")
+# Routes. Each has a name, a color, and stops in order.
+# These coordinates are approximate placeholders. Replace with real stops.
+ROUTES = {
+    "route_1": {
+        "name": "Meskel Square - Bole Airport (sample)",
+        "color": "#2980b9",
+        "stops": [
+            {"name": "Meskel Square", "lat": 9.0107, "lng": 38.7612},
+            {"name": "Stop 2 (placeholder)", "lat": 9.0050, "lng": 38.7700},
+            {"name": "Stop 3 (placeholder)", "lat": 8.9990, "lng": 38.7790},
+            {"name": "Stop 4 (placeholder)", "lat": 8.9930, "lng": 38.7880},
+            {"name": "Bole Airport", "lat": 8.9779, "lng": 38.7993},
+        ],
+    }
+}
 
 
-# Lets a web page opened from your computer talk to this server
+def get_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+# Create the buses table the first time the server runs
+def init_db():
+    conn = get_db()
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS buses (
+            bus_id     TEXT PRIMARY KEY,
+            route_id   TEXT NOT NULL,
+            lat        REAL NOT NULL,
+            lng        REAL NOT NULL,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    conn.commit()
+    conn.close()
+
+
+init_db()
+
+
 @app.after_request
 def allow_browser_access(response):
     response.headers["Access-Control-Allow-Origin"] = "*"
@@ -15,36 +60,69 @@ def allow_browser_access(response):
     return response
 
 
+@app.route("/routes")
+def routes():
+    return jsonify(ROUTES)
+
+
 @app.route("/location", methods=["GET", "POST", "OPTIONS"])
 def location():
-    global bus_location
-
-    # The browser asks this first before sending data; just say "OK"
     if request.method == "OPTIONS":
         return "", 204
 
-    # The driver's phone sends a new location
+    # A driver's phone sends a location. Save it, replacing that bus's old one.
     if request.method == "POST":
         data = request.get_json()
-        bus_location = {"lat": data["lat"], "lng": data["lng"]}
+        bus_id = str(data.get("bus_id", "")).strip()
+        route_id = data.get("route_id")
+        if not bus_id:
+            return jsonify({"error": "bus_id is required"}), 400
+        if route_id not in ROUTES:
+            return jsonify({"error": "unknown route_id"}), 400
+
+        conn = get_db()
+        conn.execute(
+            """
+            INSERT INTO buses (bus_id, route_id, lat, lng, updated_at)
+            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(bus_id) DO UPDATE SET
+                route_id = excluded.route_id,
+                lat = excluded.lat,
+                lng = excluded.lng,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (bus_id, route_id, data["lat"], data["lng"]),
+        )
+        conn.commit()
+        conn.close()
         return jsonify({"status": "saved"})
 
-    # The rider's map asks for the latest location
-    return jsonify(bus_location)
-
-# The rider map page
+    # The rider map asks for all buses
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT bus_id, route_id, lat, lng FROM buses").fetchall()
+    conn.close()
+    return jsonify(
+        {
+            row["bus_id"]: {
+                "lat": row["lat"],
+                "lng": row["lng"],
+                "route_id": row["route_id"],
+            }
+            for row in rows
+        }
+    )
 
 
 @app.route("/")
 def rider_page():
-    return send_from_directory(".", "index.html")
+    return send_from_directory(BASE_DIR, "index.html")
 
 
-# The driver page
 @app.route("/driver")
 def driver_page():
-    return send_from_directory(".", "driver.html")
+    return send_from_directory(BASE_DIR, "driver.html")
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    app.run(debug=True, port=5001)
