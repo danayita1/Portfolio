@@ -5,6 +5,8 @@ A live bus tracking web app, built to solve a real problem in Addis Ababa: many 
 
 **Live demo:** https://danayitdev.pythonanywhere.com/
 
+![Bus Tracker map](screenshot.png)
+
 ## How it works
 
 - **Driver page** (`/driver`): the driver taps one button and the phone shares its GPS location.
