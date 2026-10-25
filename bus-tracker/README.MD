@@ -1,6 +1,9 @@
 # Bus Tracker
 
+
 A live bus tracking web app, built to solve a real problem in Addis Ababa: many buses have no GPS trackers, so riders wait at stops without knowing when the bus will arrive.
+
+**Live demo:** https://danayitdev.pythonanywhere.com/
 
 ## How it works
 
@@ -25,5 +28,5 @@ Python, Flask, JavaScript, Leaflet, OpenStreetMap, HTML, CSS
 - [ ] Routes and stops for a real Addis Ababa route
 - [ ] Estimated arrival time at a stop
 - [ ] Database storage
-- [ ] Deploy online so drivers can use it from a phone
+- [x] 
 - [ ] Driver login
