@@ -183,7 +183,13 @@
               markers[id].bindTooltip(label, { permanent: true, direction: 'top' });
             }
           });
-
+                    // Remove dots for buses that are no longer reporting
+          Object.keys(markers).forEach(function (id) {
+            if (!buses[id]) {
+              map.removeLayer(markers[id]);
+              delete markers[id];
+            }
+          });
           updateStopTimes(buses);
         })
         .catch(function (error) {

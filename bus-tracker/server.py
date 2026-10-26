@@ -8,6 +8,8 @@ app = Flask(__name__)
 # The database is a file called buses.db, saved next to this script
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "buses.db")
+# Buses that haven't reported in this many minutes are hidden from the map
+STALE_MINUTES = 5
 # Routes. Each has a name, a color, and stops in order.
 # These coordinates are approximate placeholders. Replace with real stops.
 ROUTES = {
@@ -100,7 +102,10 @@ def location():
     # The rider map asks for all buses
     conn = get_db()
     rows = conn.execute(
-        "SELECT bus_id, route_id, lat, lng FROM buses").fetchall()
+        "SELECT bus_id, route_id, lat, lng FROM buses "
+        "WHERE updated_at >= datetime('now', ?)",
+        (f"-{STALE_MINUTES} minutes",),
+    ).fetchall()
     conn.close()
     return jsonify(
         {
