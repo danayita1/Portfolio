@@ -36,7 +36,7 @@ Python, Flask, SQLite, JavaScript, Leaflet, OpenStreetMap, HTML, CSS. Deployed o
 - [x] Estimated arrival time at a stop
 - [x] Database storage
 - [x] Deploy online so drivers can use it from a phone
-- [ ] Hide buses that stopped reporting
+- [x] Hide buses that stopped reporting
 - [ ] Driver login
 - [ ] Real Addis Ababa stops
 - [ ] Learn each bus's real speed for better arrival times
