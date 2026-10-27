@@ -1,3 +1,5 @@
+import hmac
+import json
 import os
 import sqlite3
 
@@ -5,11 +7,12 @@ from flask import Flask, jsonify, request, send_from_directory
 
 app = Flask(__name__)
 
-# The database is a file called buses.db, saved next to this script
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "buses.db")
+
 # Buses that haven't reported in this many minutes are hidden from the map
 STALE_MINUTES = 5
+
 # Routes. Each has a name, a color, and stops in order.
 # These coordinates are approximate placeholders. Replace with real stops.
 ROUTES = {
@@ -25,6 +28,16 @@ ROUTES = {
         ],
     }
 }
+
+
+# Driver access codes live in drivers.json, which is NOT uploaded to GitHub.
+# It is read on every request, so editing the file takes effect immediately.
+def load_drivers():
+    try:
+        with open(os.path.join(BASE_DIR, "drivers.json")) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
 
 
 def get_db():
@@ -72,15 +85,30 @@ def location():
     if request.method == "OPTIONS":
         return "", 204
 
-    # A driver's phone sends a location. Save it, replacing that bus's old one.
+    # A driver's phone sends a location. Check the access code first.
     if request.method == "POST":
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         bus_id = str(data.get("bus_id", "")).strip()
+        code = str(data.get("code", ""))
         route_id = data.get("route_id")
+
         if not bus_id:
             return jsonify({"error": "bus_id is required"}), 400
+
+        expected = load_drivers().get(bus_id)
+        if expected is None or not hmac.compare_digest(
+            str(expected).encode(), code.encode()
+        ):
+            return jsonify({"error": "wrong bus ID or access code"}), 403
+
         if route_id not in ROUTES:
             return jsonify({"error": "unknown route_id"}), 400
+
+        try:
+            lat = float(data["lat"])
+            lng = float(data["lng"])
+        except (KeyError, TypeError, ValueError):
+            return jsonify({"error": "lat and lng must be numbers"}), 400
 
         conn = get_db()
         conn.execute(
@@ -93,13 +121,13 @@ def location():
                 lng = excluded.lng,
                 updated_at = CURRENT_TIMESTAMP
             """,
-            (bus_id, route_id, data["lat"], data["lng"]),
+            (bus_id, route_id, lat, lng),
         )
         conn.commit()
         conn.close()
         return jsonify({"status": "saved"})
 
-    # The rider map asks for all buses
+    # The rider map asks for all buses that reported recently (no code needed)
     conn = get_db()
     rows = conn.execute(
         "SELECT bus_id, route_id, lat, lng FROM buses "

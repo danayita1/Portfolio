@@ -16,6 +16,8 @@
   <h1>Driver Mode</h1>
   <input id="busId" type="text" placeholder="Bus ID, e.g. Bus 1">
   <br>
+  <input id="code" type="password" placeholder="Access code">
+  <br>
   <select id="route"></select>
   <br>
   <button id="toggle">Start sharing location</button>
@@ -26,6 +28,7 @@
     var button = document.getElementById('toggle');
     var statusEl = document.getElementById('status');
     var busInput = document.getElementById('busId');
+    var codeInput = document.getElementById('code');
     var routeSelect = document.getElementById('route');
 
     // Fill the route dropdown from the server
@@ -43,6 +46,19 @@
         statusEl.textContent = 'Could not load routes.';
       });
 
+    function stopSharing(message) {
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+      }
+      busInput.disabled = false;
+      codeInput.disabled = false;
+      routeSelect.disabled = false;
+      button.textContent = 'Start sharing location';
+      button.className = '';
+      statusEl.textContent = message;
+    }
+
     function sendLocation(position) {
       var lat = position.coords.latitude;
       var lng = position.coords.longitude;
@@ -52,12 +68,21 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           bus_id: busInput.value,
+          code: codeInput.value,
           route_id: routeSelect.value,
           lat: lat,
           lng: lng
         })
       })
-        .then(function () {
+        .then(function (response) {
+          if (response.status === 403) {
+            stopSharing('Wrong bus ID or access code.');
+            return;
+          }
+          if (!response.ok) {
+            statusEl.textContent = 'The server rejected the location.';
+            return;
+          }
           statusEl.textContent = busInput.value + ' sharing. Last sent: ' + lat.toFixed(5) + ', ' + lng.toFixed(5);
         })
         .catch(function () {
@@ -75,6 +100,10 @@
           statusEl.textContent = 'Please type a Bus ID first.';
           return;
         }
+        if (codeInput.value === '') {
+          statusEl.textContent = 'Please type your access code.';
+          return;
+        }
         if (!navigator.geolocation) {
           statusEl.textContent = 'This device does not support location.';
           return;
@@ -84,17 +113,12 @@
           enableHighAccuracy: true
         });
         busInput.disabled = true;
+        codeInput.disabled = true;
         routeSelect.disabled = true;
         button.textContent = 'Stop sharing';
         button.className = 'stop';
       } else {
-        navigator.geolocation.clearWatch(watchId);
-        watchId = null;
-        busInput.disabled = false;
-        routeSelect.disabled = false;
-        button.textContent = 'Start sharing location';
-        button.className = '';
-        statusEl.textContent = 'Not sharing.';
+        stopSharing('Not sharing.');
       }
     });
   </script>
