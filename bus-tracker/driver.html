@@ -31,6 +31,33 @@
     var codeInput = document.getElementById('code');
     var routeSelect = document.getElementById('route');
 
+
+    // Ask the phone to keep the screen on while sharing, so GPS doesn't pause
+    var wakeLock = null;
+
+    async function keepScreenOn() {
+      try {
+        if ('wakeLock' in navigator) {
+          wakeLock = await navigator.wakeLock.request('screen');
+        }
+      } catch (e) {
+        // Not supported or denied. Sharing still works without it.
+      }
+    }
+
+    function releaseScreen() {
+      if (wakeLock) {
+        wakeLock.release();
+        wakeLock = null;
+      }
+    }
+
+    // The screen lock is dropped when the page is hidden. Take it again when the driver returns.
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'visible' && watchId !== null) {
+        keepScreenOn();
+      }
+    });
     // Fill the route dropdown from the server
     fetch('/routes')
       .then(function (r) { return r.json(); })
@@ -47,6 +74,7 @@
       });
 
     function stopSharing(message) {
+        releaseScreen();
       if (watchId !== null) {
         navigator.geolocation.clearWatch(watchId);
         watchId = null;
@@ -112,8 +140,8 @@
         watchId = navigator.geolocation.watchPosition(sendLocation, locationError, {
           enableHighAccuracy: true
         });
-        busInput.disabled = true;
-        codeInput.disabled = true;
+        keepScreenOn();
+        busInput.disabled = true;        codeInput.disabled = true;
         routeSelect.disabled = true;
         button.textContent = 'Stop sharing';
         button.className = 'stop';
