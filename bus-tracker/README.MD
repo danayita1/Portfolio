@@ -26,8 +26,8 @@ Python, Flask, SQLite, JavaScript, Leaflet, OpenStreetMap, HTML, CSS. Deployed o
 ## Current limits
 
 - The route and stops are placeholders, not surveyed bus stops.
-- Arrival estimates assume a fixed speed of 20 km/h, so they are rough.
-  -- Drivers use one shared access code per bus, with no individual accounts yet.
+  rrival estimates use each bus's measured speed and fall back to an assumed 20 km/h when there isn't enough recent data, so they are rough
+- Drivers use one shared access code per bus, with no individual accounts yet.
 
 ## Roadmap
 
@@ -39,4 +39,4 @@ Python, Flask, SQLite, JavaScript, Leaflet, OpenStreetMap, HTML, CSS. Deployed o
 - [x] Hide buses that stopped reporting
 - [x] Driver access codes
 - [ ] Real Addis Ababa stops
-- [ ] Learn each bus's real speed for better arrival times
+- [x] Learn each bus's real speed for better arrival times
