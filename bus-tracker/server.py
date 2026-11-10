@@ -30,9 +30,13 @@ ROUTES = {
         "color": "#2980b9",
         "stops": [
             {"name": "Meskel Square", "lat": 9.0107, "lng": 38.7612},
-            {"name": "Stop 2 (placeholder)", "lat": 9.0050, "lng": 38.7700},
-            {"name": "Stop 3 (placeholder)", "lat": 8.9990, "lng": 38.7790},
-            {"name": "Stop 4 (placeholder)", "lat": 8.9930, "lng": 38.7880},
+            {"name": "Dembel", "lat": 9.0069848, "lng": 38.7662677},
+            {"name": "Getu Commercial Center", "lat": 9.0014126, "lng": 38.7697673},
+            {"name": "Bole Printing Press", "lat": 8.9976714, "lng": 38.7715908},
+            {"name": "Wollo Sefer", "lat": 8.9941697, "lng": 38.7741922},
+            {"name": "Rwanda", "lat": 8.9924, "lng": 38.7798477},
+            {"name": "Friendship", "lat": 8.9908557, "lng": 38.7844888},
+            {"name": "Bole Millennium", "lat": 8.9885373, "lng": 38.7897496},
             {"name": "Bole Airport", "lat": 8.9779, "lng": 38.7993},
         ],
     }

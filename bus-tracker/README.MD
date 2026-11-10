@@ -25,7 +25,7 @@ Python, Flask, SQLite, JavaScript, Leaflet, OpenStreetMap, HTML, CSS. Deployed o
 
 ## Current limits
 
-- The route and stops are placeholders, not surveyed bus stops.
+- Stops come from OpenStreetMap data and have not been verified on the ground. Real-world pilot testing with drivers is not done yet.
   rrival estimates use each bus's measured speed and fall back to an assumed 20 km/h when there isn't enough recent data, so they are rough
 - Drivers use one shared access code per bus, with no individual accounts yet.
 
