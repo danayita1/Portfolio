@@ -1,5 +1,6 @@
 import hmac
 import json
+import math
 import os
 import sqlite3
 
@@ -12,6 +13,14 @@ DB_PATH = os.path.join(BASE_DIR, "buses.db")
 
 # Buses that haven't reported in this many minutes are hidden from the map
 STALE_MINUTES = 5
+
+# Speed is measured from a bus's positions over this many minutes
+SPEED_WINDOW_MINUTES = 2
+# Position history older than this is deleted
+HISTORY_MINUTES = 10
+# Measured speeds outside this range are ignored (stopped, or a GPS glitch)
+MIN_SPEED_KMH = 3
+MAX_SPEED_KMH = 70
 
 # Routes. Each has a name, a color, and stops in order.
 # These coordinates are approximate placeholders. Replace with real stops.
@@ -46,7 +55,7 @@ def get_db():
     return conn
 
 
-# Create the buses table the first time the server runs
+# Create the tables the first time the server runs
 def init_db():
     conn = get_db()
     conn.execute(
@@ -60,11 +69,61 @@ def init_db():
         )
         """
     )
+    # Recent positions, used to measure how fast each bus is really moving
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS positions (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            bus_id     TEXT NOT NULL,
+            lat        REAL NOT NULL,
+            lng        REAL NOT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_positions_bus ON positions (bus_id, id)"
+    )
     conn.commit()
     conn.close()
 
 
 init_db()
+
+
+# Distance in meters between two latitude/longitude points
+def haversine_m(lat1, lng1, lat2, lng2):
+    r = 6371000
+    p1 = math.radians(lat1)
+    p2 = math.radians(lat2)
+    dp = p2 - p1
+    dl = math.radians(lng2 - lng1)
+    h = math.sin(dp / 2) ** 2 + math.cos(p1) * \
+        math.cos(p2) * math.sin(dl / 2) ** 2
+    return 2 * r * math.asin(math.sqrt(h))
+
+
+# How fast a bus has really been moving, in km/h, or None if we can't tell
+def recent_speed_kmh(conn, bus_id):
+    rows = conn.execute(
+        "SELECT lat, lng, CAST(strftime('%s', created_at) AS INTEGER) AS t "
+        "FROM positions WHERE bus_id = ? AND created_at >= datetime('now', ?) "
+        "ORDER BY id",
+        (bus_id, f"-{SPEED_WINDOW_MINUTES} minutes"),
+    ).fetchall()
+    if len(rows) < 2:
+        return None
+
+    first, last = rows[0], rows[-1]
+    seconds = last["t"] - first["t"]
+    if seconds < 30:
+        return None
+
+    meters = haversine_m(first["lat"], first["lng"], last["lat"], last["lng"])
+    kmh = meters / seconds * 3.6
+    if kmh < MIN_SPEED_KMH or kmh > MAX_SPEED_KMH:
+        return None
+    return round(kmh, 1)
 
 
 @app.after_request
@@ -123,6 +182,15 @@ def location():
             """,
             (bus_id, route_id, lat, lng),
         )
+        # Keep a short history of positions, and delete old ones
+        conn.execute(
+            "INSERT INTO positions (bus_id, lat, lng) VALUES (?, ?, ?)",
+            (bus_id, lat, lng),
+        )
+        conn.execute(
+            "DELETE FROM positions WHERE created_at < datetime('now', ?)",
+            (f"-{HISTORY_MINUTES} minutes",),
+        )
         conn.commit()
         conn.close()
         return jsonify({"status": "saved"})
@@ -134,17 +202,17 @@ def location():
         "WHERE updated_at >= datetime('now', ?)",
         (f"-{STALE_MINUTES} minutes",),
     ).fetchall()
-    conn.close()
-    return jsonify(
-        {
-            row["bus_id"]: {
-                "lat": row["lat"],
-                "lng": row["lng"],
-                "route_id": row["route_id"],
-            }
-            for row in rows
+
+    buses = {}
+    for row in rows:
+        buses[row["bus_id"]] = {
+            "lat": row["lat"],
+            "lng": row["lng"],
+            "route_id": row["route_id"],
+            "speed_kmh": recent_speed_kmh(conn, row["bus_id"]),
         }
-    )
+    conn.close()
+    return jsonify(buses)
 
 
 @app.route("/")
