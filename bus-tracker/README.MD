@@ -26,7 +26,7 @@ Python, Flask, SQLite, JavaScript, Leaflet, OpenStreetMap, HTML, CSS. Deployed o
 ## Current limits
 
 - Stops come from OpenStreetMap data and have not been verified on the ground. Real-world pilot testing with drivers is not done yet.
-  rrival estimates use each bus's measured speed and fall back to an assumed 20 km/h when there isn't enough recent data, so they are rough
+- Arrival estimates use each bus's measured speed and fall back to an assumed 20 km/h when there isn't enough recent data, so they are rough.
 - Drivers use one shared access code per bus, with no individual accounts yet.
 
 ## Roadmap
@@ -38,5 +38,6 @@ Python, Flask, SQLite, JavaScript, Leaflet, OpenStreetMap, HTML, CSS. Deployed o
 - [x] Deploy online so drivers can use it from a phone
 - [x] Hide buses that stopped reporting
 - [x] Driver access codes
-- [ ] Real Addis Ababa stops
+- [x] Stops from OpenStreetMap
 - [x] Learn each bus's real speed for better arrival times
+- [ ] Verify stops on the ground and run a pilot with real buses.
